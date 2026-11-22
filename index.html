@@ -73,7 +73,8 @@
   .pform input { border:2px solid #000; padding:8px; font-size:15px; }
   #tblProduk th { background:var(--red); padding:8px 10px; }
   #tblProduk td { padding:4px; }
-  #tblProduk td input { text-align:left; font-size:14px; padding:6px; border:1px solid #bbb; min-width:140px; }
+  #tblProduk { width:auto; }
+  #tblProduk td input { text-align:left; font-size:14px; padding:6px; border:1px solid #bbb; width:auto; min-width:0; }
   #tblProduk td.n { text-align:center; padding:4px 10px; }
   #tblProduk td.a { white-space:nowrap; }
   .hint { font-size:13px; color:#444; margin:8px 0 0; }
@@ -120,7 +121,6 @@
     #status { flex: 1 1 100%; }
     .pform { flex-direction: column; align-items: stretch; }
     .pform input, .pform button { width: 100%; }
-    #tblProduk td input { min-width: 100px; }
     #tblProduk td.a { white-space: normal; }
     #tblProduk td.a button { margin: 2px 0; }
   }

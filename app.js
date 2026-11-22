@@ -294,6 +294,13 @@
         `<td class="a"><button class="sm" data-act="save" type="button">Simpan</button> <button class="sm del" data-act="del" type="button">Hapus</button></td>`;
       tb.appendChild(tr);
     });
+    tb.querySelectorAll("input").forEach(fitInput);
+  }
+
+  // lebar kotak isian mengikuti panjang isinya
+  function fitInput(el) {
+    const n = Math.max(String(el.value).length, 4);
+    el.style.width = (n + 3) + "ch";
   }
 
   async function afterProductChange() {
@@ -323,23 +330,45 @@
   async function onProductClick(e) {
     const btn = e.target.closest("button[data-act]");
     if (!btn) return;
+    if (!sb) return toast("Supabase belum dikonfigurasi (config.js)", true);
     const tr = btn.closest("tr");
     const id = Number(tr.dataset.id);
+    const RLS_HINT = "Tidak ada data yang berubah. Jalankan supabase_update.sql di Supabase SQL Editor (izin ubah/hapus produk belum aktif).";
+
     if (btn.dataset.act === "save") {
       const name = tr.querySelector(".pn").value.trim().toUpperCase();
       const price = parseInt(tr.querySelector(".pp").value, 10);
       if (!name || isNaN(price) || price < 0) return toast("Nama dan harga harus diisi", true);
-      const { error } = await sb.from("products").update({ name, price }).eq("id", id);
+      btn.disabled = true;
+      const { data, error } = await sb.from("products").update({ name, price }).eq("id", id).select();
+      btn.disabled = false;
       if (error) return toast("Gagal menyimpan: " + dupMsg(error), true);
+      if (!data || !data.length) return toast(RLS_HINT, true);
       await afterProductChange();
       toast("Produk diperbarui");
     } else {
-      const p = products.find((x) => x.id === id);
-      if (!confirm("Hapus produk " + (p ? p.name : "") + "?\nData rekap tanggal lama tetap tersimpan.")) return;
-      const { error } = await sb.from("products").delete().eq("id", id);
-      if (error) return toast("Gagal menghapus: " + error.message, true);
+      // konfirmasi di halaman (dialog bawaan browser sering diblokir di aplikasi terpasang)
+      if (btn.dataset.confirm !== "1") {
+        btn.dataset.confirm = "1";
+        btn.textContent = "Yakin hapus?";
+        clearTimeout(btn._t);
+        btn._t = setTimeout(() => { btn.dataset.confirm = ""; btn.textContent = "Hapus"; }, 4000);
+        return;
+      }
+      clearTimeout(btn._t);
+      btn.disabled = true;
+      btn.textContent = "Menghapus...";
+      const { data, error } = await sb.from("products").delete().eq("id", id).select();
+      if (error) {
+        btn.disabled = false; btn.dataset.confirm = ""; btn.textContent = "Hapus";
+        return toast("Gagal menghapus: " + error.message, true);
+      }
+      if (!data || !data.length) {
+        btn.disabled = false; btn.dataset.confirm = ""; btn.textContent = "Hapus";
+        return toast(RLS_HINT, true);
+      }
       await afterProductChange();
-      toast("Produk dihapus");
+      toast("Produk dihapus. Data rekap tanggal lama tetap tersimpan.");
     }
   }
 
@@ -413,6 +442,7 @@
     $("btnAddProduk").addEventListener("click", addProduct);
     $("pHarga").addEventListener("keydown", (e) => { if (e.key === "Enter") addProduct(); });
     document.querySelector("#tblProduk tbody").addEventListener("click", onProductClick);
+    document.querySelector("#tblProduk tbody").addEventListener("input", (e) => fitInput(e.target));
   }
   start();
 })();
