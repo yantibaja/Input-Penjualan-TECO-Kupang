@@ -175,12 +175,13 @@
   async function fetchProducts() {
     if (!sb) return;
     const { data, error } = await sb.from("products").select("*").order("sort", { ascending: true }).order("id", { ascending: true });
-    if (error) { toast("Gagal memuat produk: " + error.message, true); return; }
+    if (error) { toast("Gagal memuat produk: " + errMsg(error), true); return; }
     products = (data || []).map((p) => ({ id: p.id, name: p.name, price: p.price, sort: p.sort }));
   }
 
   async function lastSavedDate() {
-    const { data } = await sb.from("daily_reports").select("tanggal").order("tanggal", { ascending: false }).limit(1);
+    const { data, error } = await sb.from("daily_reports").select("tanggal").order("tanggal", { ascending: false }).limit(1);
+    if (error) toast("Gagal memuat tanggal: " + errMsg(error), true);
     return data && data.length ? data[0].tanggal : null;
   }
 
@@ -221,7 +222,7 @@
         }
       }
     } catch (e) {
-      toast("Gagal memuat: " + (e.message || e), true);
+      toast("Gagal memuat: " + errMsg(e), true);
     }
     productsDirty = false;
     refreshRekap();
@@ -269,7 +270,7 @@
     $("btnSubmit").disabled = false;
     busy = false;
     $("status").textContent = "";
-    if (error) return toast("Gagal menyimpan: " + error.message, true);
+    if (error) return toast("Gagal menyimpan: " + errMsg(error), true);
     const next = addDay(tgl, 1);
     toast("Tersimpan untuk " + tgl + ". Pindah ke " + next);
     $("tanggal").value = next;
@@ -309,9 +310,20 @@
     productsDirty = true;
   }
 
-  function dupMsg(error) {
-    return error.code === "23505" ? "Nama produk sudah ada" : error.message;
+  // pesan error yang mudah dipahami + petunjuk perbaikan
+  function errMsg(e) {
+    const m = (e && e.message) || String(e);
+    const code = (e && e.code) || "";
+    if (code === "42501" || /permission denied/i.test(m))
+      return "Izin database belum aktif. Jalankan file supabase.sql di Supabase SQL Editor (aman diulang), lalu coba lagi.";
+    if (code === "PGRST204" || /minus_rill|schema cache/i.test(m))
+      return "Struktur database belum lengkap. Jalankan file supabase.sql di Supabase SQL Editor, lalu coba lagi.";
+    if (code === "23505") return "Nama produk sudah ada";
+    if (/failed to fetch|networkerror|load failed/i.test(m))
+      return "Tidak bisa terhubung ke Supabase. Periksa koneksi internet.";
+    return m;
   }
+  const dupMsg = errMsg;
 
   async function addProduct() {
     const name = $("pNama").value.trim().toUpperCase();
@@ -333,7 +345,7 @@
     if (!sb) return toast("Supabase belum dikonfigurasi (config.js)", true);
     const tr = btn.closest("tr");
     const id = Number(tr.dataset.id);
-    const RLS_HINT = "Tidak ada data yang berubah. Jalankan supabase_update.sql di Supabase SQL Editor (izin ubah/hapus produk belum aktif).";
+    const RLS_HINT = "Tidak ada data yang berubah. Jalankan file supabase.sql di Supabase SQL Editor (aman diulang), lalu coba lagi.";
 
     if (btn.dataset.act === "save") {
       const name = tr.querySelector(".pn").value.trim().toUpperCase();
@@ -361,7 +373,7 @@
       const { data, error } = await sb.from("products").delete().eq("id", id).select();
       if (error) {
         btn.disabled = false; btn.dataset.confirm = ""; btn.textContent = "Hapus";
-        return toast("Gagal menghapus: " + error.message, true);
+        return toast("Gagal menghapus: " + errMsg(error), true);
       }
       if (!data || !data.length) {
         btn.disabled = false; btn.dataset.confirm = ""; btn.textContent = "Hapus";
